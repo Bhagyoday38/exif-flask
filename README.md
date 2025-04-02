@@ -1,1 +1,0 @@
-# exif-data-extractor
