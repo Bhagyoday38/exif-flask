@@ -1,0 +1,43 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    text-align: center;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#drop-area {
+    border: 2px dashed #1fff0b;
+    padding: 20px;
+    margin-bottom: 20px;
+    cursor: pointer;
+}
+
+#map {
+    width: 600px;
+    height: 400px;
+    margin-bottom: 20px;
+}
+
+.exif-info {
+    margin-top: 20px;
+}
+
+.exif-info table {
+    width: 50%;
+    border-collapse: collapse;
+}
+
+.exif-info th, .exif-info td {
+    border: 1px solid #ff0000;
+    padding: 8px;
+    text-align: left;
+}
+
+.exif-info th {
+    background-color: #ef0303;
+}
