@@ -204,21 +204,51 @@
             transform: translateY(-2px);
         }
 
-        @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-                margin: 0;
-                width: 100%;
-            }
-
-            h1 {
-                font-size: 2.5rem;
-            }
-
-            table th, table td {
-                font-size: 0.9rem;
-            }
+        /* New CSS you wanted to add */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
         }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #drop-area {
+            border: 2px dashed #1fff0b;
+            padding: 20px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+
+        #map {
+            width: 600px;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        .exif-info {
+            margin-top: 20px;
+        }
+
+        .exif-info table {
+            width: 50%;
+            border-collapse: collapse;
+        }
+
+        .exif-info th, .exif-info td {
+            border: 1px solid #ff0000;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .exif-info th {
+            background-color: #ef0303;
+        }
+
     </style>
 </head>
 <body>
