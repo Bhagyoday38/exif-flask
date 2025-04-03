@@ -122,6 +122,10 @@
             margin-right: 10px;
         }
 
+        #result-container {
+            display: none;
+        }
+
         .result {
             background-color: rgba(30, 35, 50, 0.9);
             border-radius: 10px;
@@ -170,7 +174,7 @@
             border-bottom: none;
         }
 
-        .image-preview, .video-preview {
+        .image-preview {
             max-width: 100%;
             border-radius: 10px;
             margin-top: 20px;
@@ -204,63 +208,33 @@
             transform: translateY(-2px);
         }
 
-        /* New CSS you wanted to add */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            text-align: center;
-        }
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 0;
+                width: 100%;
+            }
 
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+            h1 {
+                font-size: 2.5rem;
+            }
 
-        #drop-area {
-            border: 2px dashed #1fff0b;
-            padding: 20px;
-            margin-bottom: 20px;
-            cursor: pointer;
+            table th, table td {
+                font-size: 0.9rem;
+            }
         }
-
-        #map {
-            width: 600px;
-            height: 400px;
-            margin-bottom: 20px;
-        }
-
-        .exif-info {
-            margin-top: 20px;
-        }
-
-        .exif-info table {
-            width: 50%;
-            border-collapse: collapse;
-        }
-
-        .exif-info th, .exif-info td {
-            border: 1px solid #ff0000;
-            padding: 8px;
-            text-align: left;
-        }
-
-        .exif-info th {
-            background-color: #ef0303;
-        }
-
     </style>
 </head>
 <body>
     <div class="container">
-        <h1><i class="fas fa-file-image"></i>EXIF Data Extractor</h1>
-        
+        <h1><i class="fas fa-file-image"></i> EXIF Data Extractor</h1>
+
         {% if error %}
         <div class="error">
             <i class="fas fa-exclamation-triangle"></i> {{ error }}
         </div>
         {% endif %}
-        
+
         <form action="/" method="post" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="file"><i class="fas fa-upload"></i> Upload an Image or Video File:</label>
@@ -271,49 +245,48 @@
             </button>
         </form>
 
-        {% if image_url %}
-        <div class="result">
-            <h3><i class="fas fa-image"></i>Image Preview</h3>
-            <img src="{{ image_url }}" alt="Uploaded Image" class="image-preview">
-        </div>
-        {% endif %}
+        <!-- Result Container (Initially Hidden) -->
+        <div id="result-container">
+            <!-- Show Image Preview only if image_url exists -->
+            {% if image_url %}
+            <div class="result">
+                <h3><i class="fas fa-image"></i> Image Preview</h3>
+                <img src="{{ image_url }}" alt="Uploaded Image" class="image-preview">
+            </div>
+            {% endif %}
 
-        {% if video_metadata %}
-        <div class="result">
-            <h3><i class="fas fa-video"></i>Video Metadata</h3>
-            <p><strong>Frames Per Second (FPS):</strong> {{ video_metadata.fps }}</p>
-            <p><strong>Frame Count:</strong> {{ video_metadata.frame_count }}</p>
-            <p><strong>Duration:</strong> {{ video_metadata.duration }} seconds</p>
-            <video controls class="video-preview">
-                <source src="{{ file_url }}" type="video/mp4">
-                Your browser does not support the video tag.
-            </video>
-        </div>
-        {% endif %}
-        
-        {% if exif_data %}
-        <div class="result">
-            <h3><i class="fas fa-info-circle"></i>EXIF Data</h3>
-            <table>
-                <tr>
-                    <th>Tag</th>
-                    <th>Value</th>
-                </tr>
-                {% for tag, value in exif_data.items() %}
-                <tr>
-                    <td>{{ tag }}</td>
-                    <td>{{ value }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
+            <!-- Show EXIF data only if exif_data exists -->
+            {% if exif_data %}
+            <div class="result">
+                <h3><i class="fas fa-info-circle"></i> EXIF Data</h3>
+                <table>
+                    <tr>
+                        <th>Tag</th>
+                        <th>Value</th>
+                    </tr>
+                    {% for tag, value in exif_data.items() %}
+                    <tr>
+                        <td>{{ tag }}</td>
+                        <td>{{ value }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
 
-        {% if gps_lat and gps_lon %}
-        <a href="{{ google_maps_url }}" class="gps-link" target="_blank">
-            <i class="fas fa-map-marker-alt"></i> View on Google Maps
-        </a>
-        {% endif %}
-        {% endif %}
+            <!-- Show Google Maps link only if GPS data is available -->
+            {% if gps_lat and gps_lon %}
+            <a href="{{ google_maps_url }}" class="gps-link" target="_blank">
+                <i class="fas fa-map-marker-alt"></i> View on Google Maps
+            </a>
+            {% endif %}
+            {% endif %}
+        </div>
     </div>
+
+    <script>
+        // Display result container after form submission and file upload
+        const resultContainer = document.getElementById("result-container");
+        resultContainer.style.display = "block";
+    </script>
 </body>
 </html>
