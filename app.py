@@ -149,4 +149,5 @@ if __name__ == '__main__':
         os.makedirs(app.config['UPLOAD_FOLDER'])
     
     # Run the Flask application on all available interfaces (0.0.0.0)
-    app.run(debug=True, host='0.0.0.0')
+    # app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0', port=5001)
