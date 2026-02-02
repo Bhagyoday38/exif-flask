@@ -1,0 +1,27 @@
+import time
+
+# Use the raw disk path to bypass filesystem permissions
+# \\.\E: targets the drive letter E specifically
+DISK_PATH = r"\\.\D:"
+
+def poke_controller():
+    print(f"Sending activity pulses to RTL9210B on {DISK_PATH}...")
+    print("Press Ctrl+C to stop.")
+    
+    try:
+        # We open the 'raw' disk for reading
+        with open(DISK_PATH, "rb") as disk:
+            while True:
+                # Read 1KB from the start of the disk
+                disk.seek(0)
+                data = disk.read(1024)
+                
+                # Pulse every 0.5 seconds to keep the bridge chip 'awake'
+                time.sleep(0.5)
+    except PermissionError:
+        print("ERROR: You MUST run this script as Administrator.")
+    except Exception as e:
+        print(f"Unexpected Error: {e}")
+
+if __name__ == "__main__":
+    poke_controller()
