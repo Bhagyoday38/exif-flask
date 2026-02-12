@@ -29,7 +29,7 @@ def allowed_video_file(filename):
 def get_exif_data(image_path):
     try:
         image = Image.open(image_path)
-        exif_data = image._getexif()
+        exif_data = image.getexif()
         if exif_data:
             exif_dict = {}
             for tag, value in exif_data.items():
@@ -64,9 +64,9 @@ def get_gps_coordinates_from_image(exif_data):
             longitude = dms_to_decimal(lon)
             
             # Adjust sign based on hemisphere (N/S for latitude, E/W for longitude)
-            if gps_coords.get('GPSLatitudeRef') == 'S':
+            if latitude is not None and gps_coords.get('GPSLatitudeRef') == 'S':
                 latitude = -latitude
-            if gps_coords.get('GPSLongitudeRef') == 'W':
+            if longitude is not None and gps_coords.get('GPSLongitudeRef') == 'W':
                 longitude = -longitude
             
             return latitude, longitude
@@ -102,7 +102,7 @@ def index():
         # Get the uploaded image or video file
         uploaded_file = request.files.get('file')
         
-        if uploaded_file:
+        if uploaded_file and uploaded_file.filename:
             filename = secure_filename(uploaded_file.filename)
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             uploaded_file.save(file_path)
