@@ -1,279 +1,132 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>EXIF Data Extractor</title>
-    <link
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
-        rel="stylesheet"
-    />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap"
-        rel="stylesheet"
-    />
-    <style>
-        /* (Same CSS as before, for brevity just keep your styling) */
-        :root {
-            --primary-color: #00ff9d;
-            --secondary-color: #ff007f;
-            --background-gradient-start: #141e30;
-            --background-gradient-end: #243b55;
-            --text-color: #e0e0e0;
-            --card-background: rgba(19, 23, 35, 0.9);
-            --border-color: rgba(0, 255, 157, 0.5);
-        }
-        /* ... rest of your CSS ... */
-        body {
-            font-family: "Orbitron", sans-serif;
-            background: linear-gradient(
-                135deg,
-                var(--background-gradient-start),
-                var(--background-gradient-end)
-            );
-            color: var(--text-color);
-            line-height: 1.6;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        .container {
-            background: var(--card-background);
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-            width: 100%;
-            max-width: 600px;
-            padding: 40px;
-            text-align: center;
-            transition: all 0.3s ease;
-            border: 2px solid var(--border-color);
-        }
-        /* ... more CSS ... */
-        h1 {
-            color: var(--primary-color);
-            margin-bottom: 30px;
-            font-size: 3rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-transform: uppercase;
-        }
-        h1 i {
-            margin-right: 15px;
-            color: var(--secondary-color);
-        }
-        .form-group {
-            margin-bottom: 25px;
-            text-align: left;
-        }
-        label {
-            display: block;
-            margin-bottom: 10px;
-            color: var(--text-color);
-            font-weight: 600;
-            font-size: 1.2rem;
-        }
-        input[type="file"] {
-            width: 100%;
-            padding: 15px;
-            border: 2px dashed var(--primary-color);
-            border-radius: 10px;
-            background-color: #1c2431;
-            color: var(--text-color);
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-        input[type="file"]:hover {
-            border-color: var(--secondary-color);
-            box-shadow: 0 0 10px var(--secondary-color);
-        }
-        button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 10px;
-            cursor: pointer;
-            width: 100%;
-            font-weight: 600;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        button:hover {
-            background-color: var(--secondary-color);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px var(--secondary-color);
-        }
-        button i {
-            margin-right: 10px;
-        }
-        .result {
-            background-color: rgba(30, 35, 50, 0.9);
-            border-radius: 10px;
-            padding: 25px;
-            margin-top: 30px;
-            text-align: left;
-            box-shadow: 0 5px 20px rgba(0, 255, 157, 0.2);
-        }
-        .result h3 {
-            color: var(--primary-color);
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-        }
-        .result h3 i {
-            margin-right: 10px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 10px;
-        }
-        table th,
-        table td {
-            padding: 12px;
-            border-bottom: 1px solid #333;
-            text-align: left;
-            font-size: 1rem;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 200px;
-        }
-        table th {
-            background-color: var(--primary-color);
-            color: white;
-            text-transform: uppercase;
-        }
-        table tr:last-child td {
-            border-bottom: none;
-        }
-        .image-preview, video {
-            max-width: 100%;
-            border-radius: 10px;
-            margin-top: 20px;
-            box-shadow: 0 5px 20px rgba(0, 255, 157, 0.1);
-        }
-        .error {
-            color: #e74c3c;
-            background-color: rgba(231, 76, 60, 0.1);
-            border: 1px solid rgba(231, 76, 60, 0.3);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .gps-link {
-            display: inline-block;
-            background-color: #00ff9d;
-            color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 10px;
-            margin-top: 20px;
-            transition: all 0.3s ease;
-            font-size: 1.1rem;
-        }
-        .gps-link:hover {
-            background-color: #ff007f;
-            transform: translateY(-2px);
-        }
-    </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101722">
+    <title>Image &amp; Video Metadata Extractor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
-    <div class="container">
-        <h1><i class="fas fa-file-image"></i> EXIF Data Extractor</h1>
+    <main class="page-shell">
+        <header class="intro">
+            <p class="eyebrow">PRIVATE BY DESIGN · SIMPLE TO USE</p>
+            <h1>See what your files <span>remember.</span></h1>
+            <p class="intro-copy">
+                Inspect image EXIF details, GPS coordinates, and basic video metadata
+                in one place.
+            </p>
+        </header>
 
-        {% if error %}
-        <div class="error">
-            <i class="fas fa-exclamation-triangle"></i> {{ error }}
-        </div>
-        {% endif %}
-
-        <form action="{{ url_for('index') }}" method="post" enctype="multipart/form-data" id="upload-form">
-            <div class="form-group">
-                <label for="file"><i class="fas fa-upload"></i> Upload an Image or Video File:</label>
-                <input type="file" name="file" id="file" required />
+        <section class="workspace" aria-labelledby="upload-title">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">METADATA VIEWER</p>
+                    <h2 id="upload-title">Choose a file</h2>
+                </div>
+                <span class="privacy-note">Files stay on this server</span>
             </div>
-            <button type="submit">
-                <i class="fas fa-cloud-upload-alt"></i> Upload File
-            </button>
-        </form>
+
+            {% if error %}
+            <div class="notice" role="alert">{{ error }}</div>
+            {% endif %}
+
+            <form action="{{ url_for('index') }}" method="post" enctype="multipart/form-data" id="upload-form">
+                <label class="drop-zone" id="drop-zone" for="file">
+                    <span class="upload-icon" aria-hidden="true">↑</span>
+                    <span class="drop-title">Drop a file here or <span>browse</span></span>
+                    <span class="drop-help">JPG, PNG, MP4, AVI, MOV, or MKV · up to 16 MB</span>
+                    <span class="selected-file" id="selected-file" aria-live="polite">No file selected</span>
+                    <input
+                        type="file"
+                        name="file"
+                        id="file"
+                        accept=".jpg,.jpeg,.png,.mp4,.avi,.mov,.mkv,image/jpeg,image/png,video/mp4,video/x-msvideo,video/quicktime,video/x-matroska"
+                        required
+                    >
+                </label>
+                <button class="submit-button" type="submit" id="submit-button">
+                    <span id="button-label">Inspect file</span>
+                    <span aria-hidden="true">→</span>
+                </button>
+                <p class="form-hint">Your original file is not modified.</p>
+            </form>
+        </section>
 
         {% if file_url %}
-            {% if file_url.endswith(('.jpg', '.jpeg', '.png')) %}
-            <div class="result" id="image-result">
-                <h3><i class="fas fa-image"></i> Image Preview</h3>
-                <img src="{{ file_url }}" alt="Uploaded Image" class="image-preview" />
-            </div>
-            {% elif file_url.endswith(('.mp4', '.avi', '.mov', '.mkv')) %}
-            <div class="result" id="video-result">
-                <h3><i class="fas fa-video"></i> Video Preview</h3>
-                <video controls class="image-preview">
-                    <source src="{{ file_url }}" type="video/mp4" />
-                    Your browser does not support the video tag.
-                </video>
-            </div>
+        <section class="results" aria-label="File results">
+            {% if filename %}
+            <p class="file-caption">Showing results for <strong>{{ filename }}</strong></p>
             {% endif %}
+
+            {% if media_type == "image" %}
+            <figure class="preview-card">
+                <img src="{{ file_url }}" alt="Preview of {{ filename or 'uploaded image' }}">
+                <figcaption>Image preview</figcaption>
+            </figure>
+            {% elif media_type == "video" %}
+            <figure class="preview-card">
+                <video src="{{ file_url }}" controls preload="metadata">
+                    Your browser cannot play this video format.
+                </video>
+                <figcaption>Video preview</figcaption>
+            </figure>
+            {% endif %}
+
+            {% if exif_data %}
+            <section class="data-card" aria-labelledby="exif-title">
+                <div class="data-heading">
+                    <div>
+                        <p class="eyebrow">IMAGE DETAILS</p>
+                        <h2 id="exif-title">EXIF metadata</h2>
+                    </div>
+                    <span class="tag-count">{{ exif_data|length }} tags</span>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th scope="col">Tag</th><th scope="col">Value</th></tr></thead>
+                        <tbody>
+                        {% for tag, value in exif_data.items() %}
+                        <tr><th scope="row">{{ tag }}</th><td>{{ value }}</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            {% endif %}
+
+            {% if gps_lat is not none and gps_lon is not none and google_maps_url %}
+            <section class="gps-card">
+                <div>
+                    <p class="eyebrow">LOCATION FOUND</p>
+                    <h2>GPS coordinates</h2>
+                    <p class="coordinates">{{ "%.6f"|format(gps_lat) }}, {{ "%.6f"|format(gps_lon) }}</p>
+                </div>
+                <a class="map-link" href="{{ google_maps_url }}" target="_blank" rel="noopener noreferrer">
+                    Open map <span aria-hidden="true">↗</span>
+                </a>
+            </section>
+            {% endif %}
+
+            {% if video_metadata %}
+            <section class="data-card" aria-labelledby="video-title">
+                <div class="data-heading">
+                    <div>
+                        <p class="eyebrow">VIDEO DETAILS</p>
+                        <h2 id="video-title">Stream metadata</h2>
+                    </div>
+                </div>
+                <dl class="video-details">
+                    <div><dt>Resolution</dt><dd>{{ video_metadata.width or "Unknown" }} × {{ video_metadata.height or "Unknown" }}</dd></div>
+                    <div><dt>Duration</dt><dd>{% if video_metadata.duration is not none %}{{ "%.2f"|format(video_metadata.duration) }} seconds{% else %}Unknown{% endif %}</dd></div>
+                </dl>
+            </section>
+            {% endif %}
+        </section>
         {% endif %}
 
-        {% if exif_data %}
-        <div class="result" id="exif-result">
-            <h3><i class="fas fa-info-circle"></i> EXIF Data</h3>
-            <table id="exif-table">
-                <tr>
-                    <th>Tag</th>
-                    <th>Value</th>
-                </tr>
-                {% for tag, value in exif_data.items() %}
-                <tr>
-                    <td>{{ tag }}</td>
-                    <td>{{ value }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-        {% elif exif_data is not none %}
-        <!-- exif_data is empty dict or None -->
-        <div class="result" id="exif-result">
-            <h3><i class="fas fa-info-circle"></i> EXIF Data</h3>
-            <p>No EXIF data available</p>
-        </div>
-        {% endif %}
-
-        {% if gps_lat and gps_lon and google_maps_url %}
-        <div class="result" id="gps-result">
-            <a href="{{ google_maps_url }}" class="gps-link" target="_blank">
-                <i class="fas fa-map-marker-alt"></i> View on Google Maps
-            </a>
-        </div>
-        {% endif %}
-
-        {% if video_metadata %}
-        <div class="result" id="video-metadata-result">
-            <h3><i class="fas fa-info-circle"></i> Video Metadata</h3>
-            <table>
-                <tr>
-                    <th>Width</th>
-                    <td>{{ video_metadata.width }}</td>
-                </tr>
-                <tr>
-                    <th>Height</th>
-                    <td>{{ video_metadata.height }}</td>
-                </tr>
-                <tr>
-                    <th>Duration (seconds)</th>
-                    <td>{{ video_metadata.duration }}</td>
-                </tr>
-            </table>
-        </div>
-        {% endif %}
-    </div>
+        <footer>Metadata can include personal information such as device details or location. Review it before sharing files.</footer>
+    </main>
 </body>
 </html>

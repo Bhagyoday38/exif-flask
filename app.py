@@ -1,152 +1,221 @@
-from flask import Flask, render_template, request, url_for, send_from_directory
-from werkzeug.utils import secure_filename
-from PIL import Image
-from PIL.ExifTags import TAGS, GPSTAGS
-import os
 import atexit
+from pathlib import Path
+from uuid import uuid4
+
 import ffmpeg
-import subprocess
-import json
+from flask import Flask, render_template, request, send_from_directory, url_for
+from PIL import ExifTags, Image, UnidentifiedImageError
+from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-# Set allowed file extensions and max file size
-ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png'}
-ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv'}
-MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max file size
-app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
-app.config['UPLOAD_FOLDER'] = 'uploads'
+ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png"}
+ALLOWED_VIDEO_EXTENSIONS = {"mp4", "avi", "mov", "mkv"}
+MAX_CONTENT_LENGTH = 16 * 1024 * 1024
 
-# Function to check if the uploaded file is an allowed image type
-def allowed_image_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
+app.config["UPLOAD_FOLDER"] = str(Path(app.root_path) / "uploads")
+Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
 
-# Function to check if the uploaded file is an allowed video type
-def allowed_video_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
+GPS_IFD_TAG = 34853
+_created_uploads = set()
 
-# Function to extract EXIF data from images
-def get_exif_data(image_path):
-    try:
-        image = Image.open(image_path)
-        exif_data = image.getexif()
-        if exif_data:
-            exif_dict = {}
-            for tag, value in exif_data.items():
-                tag_name = TAGS.get(tag, tag)
-                exif_dict[tag_name] = value
-            return exif_dict
-    except Exception as e:
-        print(f"Error getting EXIF data: {e}")
-    return None
 
-# Function to convert GPS data from DMS (Degrees, Minutes, Seconds) to Decimal Degrees
-def dms_to_decimal(dms):
-    if not dms:
-        return None
-    degrees, minutes, seconds = dms
-    return degrees + (minutes / 60.0) + (seconds / 3600.0)
-
-# Function to extract GPS coordinates from EXIF data in images
-def get_gps_coordinates_from_image(exif_data):
-    gps_info = exif_data.get('GPSInfo') if exif_data else None
-    if gps_info:
-        gps_coords = {}
-        for key, value in gps_info.items():
-            tag_name = GPSTAGS.get(key, key)
-            gps_coords[tag_name] = value
-        
-        lat = gps_coords.get('GPSLatitude')
-        lon = gps_coords.get('GPSLongitude')
-        
-        if lat and lon:
-            latitude = dms_to_decimal(lat)
-            longitude = dms_to_decimal(lon)
-            
-            # Adjust sign based on hemisphere (N/S for latitude, E/W for longitude)
-            if latitude is not None and gps_coords.get('GPSLatitudeRef') == 'S':
-                latitude = -latitude
-            if longitude is not None and gps_coords.get('GPSLongitudeRef') == 'W':
-                longitude = -longitude
-            
-            return latitude, longitude
-    return None, None
-
-# Function to extract video metadata
-def get_video_metadata(video_path):
-    try:
-        metadata = ffmpeg.probe(video_path, v='error', select_streams='v:0', show_entries='stream=codec_name,width,height,r_frame_rate,duration', format='json')
-        metadata = json.loads(metadata)
-        video_stream = metadata.get('streams', [])[0]
-        width = video_stream.get('width')
-        height = video_stream.get('height')
-        duration = video_stream.get('duration')
-        return {'width': width, 'height': height, 'duration': duration}
-    except Exception as e:
-        print(f"Error extracting video metadata: {e}")
-    return None
-
-# Cleanup function to delete uploaded files
 def cleanup_uploads():
-    for file in os.listdir(app.config['UPLOAD_FOLDER']):
-        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], file))
+    for file_path in _created_uploads.copy():
+        file_path.unlink(missing_ok=True)
+        _created_uploads.discard(file_path)
 
-# Register cleanup at app exit
+
 atexit.register(cleanup_uploads)
 
-# Route to upload image or video and extract metadata
+
+def allowed_image_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
+
+def allowed_video_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
+
+
+def _display_value(value):
+    if isinstance(value, bytes):
+        return value.hex(" ")
+    if isinstance(value, dict):
+        return ", ".join(
+            f"{key}: {_display_value(item)}" for key, item in value.items()
+        )
+    if isinstance(value, (tuple, list)):
+        return ", ".join(_display_value(item) for item in value)
+    return str(value)
+
+
+def get_exif_data(image_path):
+    try:
+        with Image.open(image_path) as image:
+            exif = image.getexif()
+            if not exif:
+                return None
+
+            exif_data = {
+                ExifTags.TAGS.get(tag, str(tag)): _display_value(value)
+                for tag, value in exif.items()
+            }
+            gps_info = exif.get_ifd(GPS_IFD_TAG)
+            if gps_info:
+                exif_data["GPSInfo"] = {
+                    ExifTags.GPSTAGS.get(tag, str(tag)): value
+                    for tag, value in gps_info.items()
+                }
+            return exif_data
+    except (OSError, ValueError, TypeError, Image.DecompressionBombError):
+        return None
+
+
+def dms_to_decimal(dms):
+    try:
+        degrees, minutes, seconds = dms
+        return float(degrees) + float(minutes) / 60 + float(seconds) / 3600
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def get_gps_coordinates_from_image(exif_data):
+    if not exif_data:
+        return None, None
+
+    gps_info = exif_data.get("GPSInfo")
+    if not isinstance(gps_info, dict):
+        return None, None
+
+    latitude = dms_to_decimal(gps_info.get("GPSLatitude", ()))
+    longitude = dms_to_decimal(gps_info.get("GPSLongitude", ()))
+    if latitude is None or longitude is None:
+        return None, None
+
+    if gps_info.get("GPSLatitudeRef") == "S":
+        latitude = -latitude
+    if gps_info.get("GPSLongitudeRef") == "W":
+        longitude = -longitude
+    return latitude, longitude
+
+
+def get_video_metadata(video_path):
+    try:
+        probe = ffmpeg.probe(video_path)
+        video_stream = next(
+            (stream for stream in probe["streams"] if stream.get("codec_type") == "video"),
+            None,
+        )
+        if video_stream is None:
+            return None
+
+        duration = probe.get("format", {}).get("duration")
+        return {
+            "width": video_stream.get("width"),
+            "height": video_stream.get("height"),
+            "duration": float(duration) if duration is not None else None,
+        }
+    except (ffmpeg.Error, OSError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _render_page(**context):
+    return render_template("index.html", **context)
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_file_too_large(_error):
+    return _render_page(error="That file is too large. Choose a file smaller than 16 MB."), 413
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
-    file_url = None
-    if request.method == "POST":
-        # Get the uploaded image or video file
-        uploaded_file = request.files.get('file')
-        
-        if uploaded_file and uploaded_file.filename:
-            filename = secure_filename(uploaded_file.filename)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            uploaded_file.save(file_path)
-            
-            # Generate the URL for the uploaded file (for preview)
-            file_url = url_for('uploaded_file', filename=filename)
-            
-            # Extract metadata based on file type
-            if allowed_image_file(filename):
-                # Extract EXIF data for images
-                exif_data = get_exif_data(file_path)
-                if exif_data:
-                    gps_lat, gps_lon = get_gps_coordinates_from_image(exif_data)
-                    if gps_lat and gps_lon:
-                        google_maps_url = f"https://www.google.com/maps?q={gps_lat},{gps_lon}"
-                        return render_template("index.html", exif_data=exif_data, gps_lat=gps_lat, gps_lon=gps_lon, google_maps_url=google_maps_url, file_url=file_url)
-                    else:
-                        return render_template("index.html", exif_data=exif_data, error="No GPS data found.", file_url=file_url)
-                else:
-                    return render_template("index.html", error="No EXIF data found.", file_url=file_url)
-            
-            elif allowed_video_file(filename):
-                # Extract video metadata
-                video_metadata = get_video_metadata(file_path)
-                if video_metadata:
-                    return render_template("index.html", video_metadata=video_metadata, file_url=file_url)
-                else:
-                    return render_template("index.html", error="No video metadata found.", file_url=file_url)
-            
-            else:
-                return render_template("index.html", error="Invalid file format.", file_url=file_url)
-    
-    return render_template("index.html")
+    if request.method == "GET":
+        return _render_page()
 
-# Route to serve uploaded files (image or video)
-@app.route('/uploads/<filename>')
+    uploaded_file = request.files.get("file")
+    if uploaded_file is None or not uploaded_file.filename:
+        return _render_page(error="Choose an image or video before uploading.")
+
+    original_name = secure_filename(uploaded_file.filename)
+    if not original_name:
+        return _render_page(error="The selected file has an invalid name.")
+
+    if allowed_image_file(original_name):
+        media_type = "image"
+    elif allowed_video_file(original_name):
+        media_type = "video"
+    else:
+        return _render_page(
+            error="Unsupported file type. Choose a JPG, PNG, MP4, AVI, MOV, or MKV file."
+        )
+
+    extension = original_name.rsplit(".", 1)[1].lower()
+    filename = f"{uuid4().hex}.{extension}"
+    file_path = Path(app.config["UPLOAD_FOLDER"]) / filename
+    uploaded_file.save(file_path)
+    _created_uploads.add(file_path)
+    file_url = url_for("uploaded_file", filename=filename)
+
+    if media_type == "image":
+        try:
+            with Image.open(file_path) as image:
+                image.verify()
+        except (
+            UnidentifiedImageError,
+            OSError,
+            ValueError,
+            Image.DecompressionBombError,
+        ):
+            file_path.unlink(missing_ok=True)
+            _created_uploads.discard(file_path)
+            return _render_page(error="The selected file is not a valid image.")
+
+        exif_data = get_exif_data(file_path)
+        if exif_data:
+            gps_lat, gps_lon = get_gps_coordinates_from_image(exif_data)
+            google_maps_url = (
+                f"https://www.google.com/maps?q={gps_lat},{gps_lon}"
+                if gps_lat is not None and gps_lon is not None
+                else None
+            )
+            return _render_page(
+                exif_data=exif_data,
+                gps_lat=gps_lat,
+                gps_lon=gps_lon,
+                google_maps_url=google_maps_url,
+                file_url=file_url,
+                media_type=media_type,
+                filename=original_name,
+            )
+        return _render_page(
+            error="This image is valid, but it does not contain readable EXIF metadata.",
+            file_url=file_url,
+            media_type=media_type,
+            filename=original_name,
+        )
+
+    video_metadata = get_video_metadata(file_path)
+    if video_metadata is None:
+        file_path.unlink(missing_ok=True)
+        _created_uploads.discard(file_path)
+        return _render_page(
+            error="The selected file is not a supported video or its metadata could not be read."
+        )
+    return _render_page(
+        video_metadata=video_metadata,
+        file_url=file_url,
+        media_type=media_type,
+        filename=original_name,
+    )
+
+
+@app.route("/uploads/<filename>")
 def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
-# Run the Flask app
-if __name__ == '__main__':
-    # Ensure the 'uploads' folder exists, create if not
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
-    
-    # Run the Flask application on all available interfaces (0.0.0.0)
-    app.run(debug=True, host='0.0.0.0')
+
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0")
