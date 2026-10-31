@@ -1,20 +1,78 @@
 const form = document.querySelector("#upload-form");
-const input = document.querySelector("#file");
+const input = document.querySelector("#files");
 const dropZone = document.querySelector("#drop-zone");
 const selectedFile = document.querySelector("#selected-file");
+const selectedFiles = document.querySelector("#selected-files");
+const selectionError = document.querySelector("#selection-error");
 const submitButton = document.querySelector("#submit-button");
 const buttonLabel = document.querySelector("#button-label");
 
-if (form && input && dropZone && selectedFile && submitButton && buttonLabel) {
-  const supportedExtensions = new Set(["jpg", "jpeg", "png", "mp4", "avi", "mov", "mkv"]);
-  const maxSize = 16 * 1024 * 1024;
+if (
+  form &&
+  input &&
+  dropZone &&
+  selectedFile &&
+  selectedFiles &&
+  selectionError &&
+  submitButton &&
+  buttonLabel
+) {
+  const supportedExtensions = new Set([
+    "jpg",
+    "jpeg",
+    "png",
+    "mp4",
+    "avi",
+    "mov",
+    "mkv",
+  ]);
+  const maxFiles = Number(form.dataset.maxFiles);
+  const maxFileSize = Number(form.dataset.maxFileSize);
+  const maxTotalSize = Number(form.dataset.maxTotalSize);
 
-  function updateSelection(file) {
-    selectedFile.textContent = file ? file.name : "No file selected";
-    selectedFile.classList.toggle("has-error", Boolean(file && file.size > maxSize));
+  function formatBytes(bytes) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  input.addEventListener("change", () => updateSelection(input.files[0]));
+  function updateSelection() {
+    const files = Array.from(input.files);
+    const errors = [];
+    const totalSize = files.reduce((total, file) => total + file.size, 0);
+
+    if (files.length > maxFiles) {
+      errors.push(`Choose no more than ${maxFiles} files.`);
+    }
+    if (totalSize > maxTotalSize) {
+      errors.push("The combined file size must be under 64 MB.");
+    }
+    for (const file of files) {
+      const extension = file.name.split(".").pop().toLowerCase();
+      if (!supportedExtensions.has(extension)) {
+        errors.push(`${file.name}: unsupported file type.`);
+      } else if (file.size > maxFileSize) {
+        errors.push(`${file.name}: each file must be smaller than 16 MB.`);
+      }
+    }
+
+    selectedFiles.replaceChildren();
+    for (const file of files) {
+      const item = document.createElement("li");
+      item.textContent = `${file.name} · ${formatBytes(file.size)}`;
+      selectedFiles.append(item);
+    }
+
+    selectedFile.textContent = files.length
+      ? `${files.length} ${files.length === 1 ? "file" : "files"} selected`
+      : "Select up to 10 files · 16 MB each";
+    selectionError.textContent = errors.join(" ");
+    selectionError.hidden = errors.length === 0;
+    submitButton.disabled = files.length === 0 || errors.length > 0;
+    buttonLabel.textContent = files.length
+      ? `Inspect ${files.length} ${files.length === 1 ? "file" : "files"}`
+      : "Choose files to inspect";
+  }
+
+  input.addEventListener("change", updateSelection);
 
   for (const eventName of ["dragenter", "dragover"]) {
     dropZone.addEventListener(eventName, (event) => {
@@ -31,37 +89,29 @@ if (form && input && dropZone && selectedFile && submitButton && buttonLabel) {
   }
 
   dropZone.addEventListener("drop", (event) => {
-    const [file] = event.dataTransfer.files;
-    if (!file) return;
-
-    const extension = file.name.split(".").pop().toLowerCase();
-    if (!supportedExtensions.has(extension)) {
-      input.value = "";
-      selectedFile.textContent = "Unsupported file type. Choose an image or video listed above.";
-      selectedFile.classList.add("has-error");
-      return;
-    }
+    const droppedFiles = Array.from(event.dataTransfer.files);
+    if (droppedFiles.length === 0) return;
 
     const transfer = new DataTransfer();
-    transfer.items.add(file);
+    for (const file of [...input.files, ...droppedFiles]) {
+      transfer.items.add(file);
+    }
     input.files = transfer.files;
-    updateSelection(file);
+    updateSelection();
   });
 
   form.addEventListener("submit", (event) => {
-    const file = input.files[0];
-    if (!file) return;
-    const extension = file.name.split(".").pop().toLowerCase();
-    if (!supportedExtensions.has(extension) || file.size > maxSize) {
+    const files = Array.from(input.files);
+    if (submitButton.disabled || files.length === 0) {
       event.preventDefault();
-      selectedFile.textContent = file.size > maxSize
-        ? "That file is larger than 16 MB."
-        : "Unsupported file type. Choose an image or video listed above.";
-      selectedFile.classList.add("has-error");
       return;
     }
 
     submitButton.disabled = true;
-    buttonLabel.textContent = "Inspecting file…";
+    buttonLabel.textContent = `Inspecting ${files.length} ${
+      files.length === 1 ? "file" : "files"
+    }…`;
   });
+
+  updateSelection();
 }

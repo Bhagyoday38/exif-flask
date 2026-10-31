@@ -1,7 +1,6 @@
-# Image & Video Metadata Extractor
+# EXIF Studio
 
-A small Flask app for viewing image EXIF/GPS metadata and basic video stream
-metadata.
+A local Flask app for reviewing image EXIF/GPS data and basic video metadata.
 
 ## Run locally
 
@@ -10,19 +9,28 @@ python -m pip install -r requirements.txt
 python app.py
 ```
 
-Open `http://127.0.0.1:5000`. Video metadata extraction also requires the
-FFmpeg `ffprobe` executable to be installed and available on `PATH`.
+Open `http://127.0.0.1:5000`. The app binds to localhost and is intended for a
+single local user. It has no accounts or per-user access controls; do not expose
+it on a network or deploy it publicly until authentication and upload ownership
+are implemented. Video metadata extraction also requires the FFmpeg `ffprobe`
+executable to be installed and available on `PATH`.
 
-## Supported files
+## Uploads and privacy
 
 - Images: JPG, JPEG, PNG
 - Videos: MP4, AVI, MOV, MKV
-- Maximum upload size: 16 MB
+- Up to 10 files per batch, 16 MB per file, and 64 MB per request
 
-Files are stored in `uploads/` so the browser can show a preview. Files uploaded
-by the running app are removed on normal shutdown; files already present in that
-folder are left untouched. Image and video metadata may include personal
-information, including device details and location.
+Uploads and extracted metadata are stored locally so they remain available after
+the app restarts. They stay there until you use **Delete** for each file.
+Deleting a file removes its stored media and metadata. The original media is
+not modified. Metadata may contain personal information, including device
+details and location; review it before sharing.
+
+The app generates a temporary session secret when `FLASK_SECRET_KEY` is not
+configured. Set that environment variable to a securely generated, stable value
+if you need browser sessions to survive app restarts. This does not make the
+app safe for shared or public hosting.
 
 ## Run tests
 
