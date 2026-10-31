@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101c22">
+    <title>{% if mode == "register" %}Create account{% else %}Sign in{% endif %} · EXIF Studio</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="topbar">
+            <a class="brand" href="{{ url_for('login') }}" aria-label="EXIF Studio">
+                <span class="brand-mark" aria-hidden="true">E</span>
+                <span>EXIF <span class="brand-light">STUDIO</span></span>
+            </a>
+            <span class="local-badge"><span aria-hidden="true"></span> PRIVATE LIBRARY</span>
+        </header>
+
+        <main class="auth-main">
+            <section class="auth-card" aria-labelledby="auth-title">
+                <p class="eyebrow">YOUR FILES, YOUR SPACE</p>
+                <h1 id="auth-title">{% if mode == "register" %}Create your account{% else %}Welcome back{% endif %}</h1>
+                <p class="auth-copy">
+                    {% if mode == "register" %}
+                    Make a private library for your images and videos.
+                    {% else %}
+                    Sign in to view your private media library.
+                    {% endif %}
+                </p>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% for category, message in messages %}
+                    <div class="notice notice-{{ category }}" role="{% if category == 'error' %}alert{% else %}status{% endif %}">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                {% endwith %}
+
+                <form class="auth-form" action="{{ url_for(mode) }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <label for="username">Username</label>
+                    <input
+                        id="username"
+                        name="username"
+                        type="text"
+                        autocomplete="username"
+                        minlength="3"
+                        maxlength="32"
+                        pattern="[A-Za-z0-9_]{3,32}"
+                        required
+                    >
+                    <label for="password">Password</label>
+                    <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        autocomplete="{% if mode == 'register' %}new-password{% else %}current-password{% endif %}"
+                        minlength="{% if mode == 'register' %}12{% else %}1{% endif %}"
+                        maxlength="128"
+                        required
+                    >
+                    {% if mode == "register" %}
+                    <p class="auth-hint">Use 12–128 characters. Usernames may contain letters, numbers, and underscores.</p>
+                    {% endif %}
+                    <button class="submit-button auth-submit" type="submit">
+                        <span>{% if mode == "register" %}Create account{% else %}Sign in{% endif %}</span>
+                        <span aria-hidden="true">→</span>
+                    </button>
+                </form>
+
+                <p class="auth-switch">
+                    {% if mode == "register" %}
+                    Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
+                    {% else %}
+                    New to EXIF Studio? <a href="{{ url_for('register') }}">Create an account</a>
+                    {% endif %}
+                </p>
+            </section>
+        </main>
+        <footer>
+            <span>EXIF Studio</span>
+            <p>Your media is visible only after you sign in to its account.</p>
+        </footer>
+    </div>
+</body>
+</html>

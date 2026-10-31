@@ -15,7 +15,14 @@
                 <span class="brand-mark" aria-hidden="true">E</span>
                 <span>EXIF <span class="brand-light">STUDIO</span></span>
             </a>
-            <span class="local-badge"><span aria-hidden="true"></span> LOCAL WORKSPACE</span>
+            <div class="account-controls">
+                <span class="local-badge"><span aria-hidden="true"></span> PRIVATE LIBRARY</span>
+                <span class="account-name">{{ current_user.username }}</span>
+                <form action="{{ url_for('logout') }}" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="sign-out-button" type="submit">Sign out</button>
+                </form>
+            </div>
         </header>
 
         <main>

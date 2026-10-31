@@ -22,15 +22,41 @@ class MetadataAppTests(unittest.TestCase):
             DATABASE=str(root / "metadata.sqlite"),
         )
         self.client = app.app.test_client()
+        self._register(self.client, "alice", "correct horse battery")
 
     def _csrf_token(self, client=None):
-        response = (client or self.client).get("/")
+        selected_client = client or self.client
+        response = selected_client.get("/")
+        if response.status_code == 302:
+            response = selected_client.get(response.location)
         match = re.search(
             rb'name="csrf_token" value="([^"]+)"',
             response.data,
         )
         self.assertIsNotNone(match, "The page should include a CSRF token.")
         return match.group(1).decode()
+
+    def _register(self, client, username, password):
+        response = client.post(
+            "/register",
+            data={
+                "csrf_token": self._csrf_token(client),
+                "username": username,
+                "password": password,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        return response
+
+    def _login(self, client, username, password):
+        return client.post(
+            "/login",
+            data={
+                "csrf_token": self._csrf_token(client),
+                "username": username,
+                "password": password,
+            },
+        )
 
     @staticmethod
     def _image(name, color):
@@ -63,6 +89,164 @@ class MetadataAppTests(unittest.TestCase):
             asset_response = self.client.get(asset_path)
             self.assertEqual(asset_response.status_code, 200)
             asset_response.close()
+
+    def test_anonymous_users_are_redirected_to_login(self):
+        anonymous_client = app.app.test_client()
+
+        response = anonymous_client.get("/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.endswith("/login"))
+
+    def test_anonymous_users_cannot_access_media_and_unknown_routes_stay_not_found(self):
+        anonymous_client = app.app.test_client()
+
+        media_response = anonymous_client.get(f"/uploads/{'a' * 32}")
+        missing_route_response = anonymous_client.get("/missing")
+
+        self.assertEqual(media_response.status_code, 302)
+        self.assertEqual(missing_route_response.status_code, 404)
+
+    def test_registration_rejects_duplicate_usernames_case_insensitively(self):
+        anonymous_client = app.app.test_client()
+        response = anonymous_client.post(
+            "/register",
+            data={
+                "csrf_token": self._csrf_token(anonymous_client),
+                "username": "Alice",
+                "password": "another secure password",
+            },
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn(b"username is unavailable", response.data.lower())
+
+    def test_registration_requires_a_long_password_and_valid_username(self):
+        anonymous_client = app.app.test_client()
+        response = anonymous_client.post(
+            "/register",
+            data={
+                "csrf_token": self._csrf_token(anonymous_client),
+                "username": "invalid name",
+                "password": "short",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(b"username", response.data.lower())
+        self.assertIn("12–128 characters".encode(), response.data)
+
+    def test_passwords_are_stored_as_hashes(self):
+        with app._database_connection() as connection:
+            row = connection.execute(
+                "SELECT password_hash FROM users WHERE username = ?",
+                ("alice",),
+            ).fetchone()
+
+        self.assertNotEqual(row["password_hash"], "correct horse battery")
+        self.assertTrue(row["password_hash"].startswith("scrypt:"))
+
+    def test_login_is_rate_limited_after_repeated_failures(self):
+        anonymous_client = app.app.test_client()
+        csrf_token = self._csrf_token(anonymous_client)
+        for _ in range(app.MAX_LOGIN_ATTEMPTS):
+            response = anonymous_client.post(
+                "/login",
+                data={
+                    "csrf_token": csrf_token,
+                    "username": "alice",
+                    "password": "incorrect password",
+                },
+            )
+            self.assertEqual(response.status_code, 401)
+
+        response = anonymous_client.post(
+            "/login",
+            data={
+                "csrf_token": csrf_token,
+                "username": "alice",
+                "password": "correct horse battery",
+            },
+        )
+
+        self.assertEqual(response.status_code, 429)
+
+    def test_users_cannot_view_or_delete_each_others_uploads(self):
+        upload_response = self.client.post(
+            "/",
+            data={
+                "csrf_token": self._csrf_token(),
+                "files": [self._image("alice-private.jpg", "red")],
+            },
+            content_type="multipart/form-data",
+        )
+        results = self.client.get(upload_response.location)
+        image_match = re.search(rb'<img src="(/uploads/([a-f0-9]{32}))"', results.data)
+        self.assertIsNotNone(image_match)
+        image_url = image_match.group(1).decode()
+        upload_id = image_match.group(2).decode()
+
+        bob = app.app.test_client()
+        self._register(bob, "bob", "another secure password")
+
+        self.assertNotIn(b"alice-private.jpg", bob.get("/").data)
+        self.assertEqual(bob.get(image_url).status_code, 404)
+        delete_response = bob.post(
+            f"/uploads/{upload_id}/delete",
+            data={"csrf_token": self._csrf_token(bob)},
+        )
+        self.assertEqual(delete_response.status_code, 404)
+        self.assertIn(b"alice-private.jpg", self.client.get("/").data)
+
+    def test_login_logout_and_protected_library(self):
+        self.client.post("/logout", data={"csrf_token": self._csrf_token()})
+        self.assertEqual(self.client.get("/").status_code, 302)
+
+        login_response = self._login(
+            self.client,
+            "ALICE",
+            "correct horse battery",
+        )
+        self.assertEqual(login_response.status_code, 302)
+        self.assertEqual(self.client.get("/").status_code, 200)
+
+    def test_legacy_unowned_uploads_are_deleted_during_migration(self):
+        upload_id = "a" * 32
+        stored_filename = f"{upload_id}.jpg"
+        upload_directory = Path(app.app.config["UPLOAD_FOLDER"])
+        upload_directory.mkdir(parents=True, exist_ok=True)
+        stored_file = upload_directory / stored_filename
+        stored_file.write_bytes(b"legacy private image")
+        with app._database_connection() as connection:
+            connection.execute("DROP TABLE uploads")
+            connection.execute(
+                """
+                CREATE TABLE uploads (
+                    id TEXT PRIMARY KEY,
+                    stored_filename TEXT NOT NULL UNIQUE,
+                    display_name TEXT NOT NULL,
+                    media_type TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO uploads
+                    (id, stored_filename, display_name, media_type, metadata_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (upload_id, stored_filename, "legacy.jpg", "image", "{}"),
+            )
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(stored_file.exists())
+        with app._database_connection() as connection:
+            rows = connection.execute("SELECT id FROM uploads").fetchall()
+        self.assertEqual(rows, [])
 
     def test_uploading_multiple_images_shows_each_result_after_redirect(self):
         response = self.client.post(
@@ -160,7 +344,12 @@ class MetadataAppTests(unittest.TestCase):
         self.assertEqual(image_response.status_code, 200)
         image_response.close()
         refreshed_client = app.app.test_client()
+        self._register(refreshed_client, "carol", "first account password")
         retained_results = refreshed_client.get("/")
+        self.assertNotIn(b"image.jpg", retained_results.data)
+        login_client = app.app.test_client()
+        self._login(login_client, "alice", "correct horse battery")
+        retained_results = login_client.get("/")
         self.assertIn(b"image.jpg", retained_results.data)
 
         rejected_delete = refreshed_client.post(
@@ -168,7 +357,7 @@ class MetadataAppTests(unittest.TestCase):
             data={"csrf_token": "invalid"},
         )
         self.assertEqual(rejected_delete.status_code, 400)
-        retained_image_response = self.client.get(image_url)
+        retained_image_response = login_client.get(image_url)
         self.assertEqual(retained_image_response.status_code, 200)
         retained_image_response.close()
 
@@ -176,9 +365,15 @@ class MetadataAppTests(unittest.TestCase):
             f"/uploads/{upload_id}/delete",
             data={"csrf_token": self._csrf_token(refreshed_client)},
         )
-        self.assertEqual(delete_response.status_code, 302)
-        self.assertEqual(self.client.get(image_url).status_code, 404)
-        self.assertNotIn(b"image.jpg", self.client.get("/").data)
+        self.assertEqual(delete_response.status_code, 404)
+        owner_delete = login_client.post(
+            f"/uploads/{upload_id}/delete",
+            data={"csrf_token": self._csrf_token(login_client)},
+        )
+        self.assertEqual(owner_delete.status_code, 302)
+        self.assertEqual(login_client.get(image_url).status_code, 404)
+        login_client.get("/")
+        self.assertNotIn(b"image.jpg", login_client.get("/").data)
 
     def test_invalid_images_are_rejected_without_storing_them(self):
         response = self.client.post(
