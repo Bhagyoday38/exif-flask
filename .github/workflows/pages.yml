@@ -37,8 +37,6 @@ jobs:
           node --test tests-js/metadata.test.cjs
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - name: Assemble static site
         run: |
           mkdir -p _site/assets

@@ -12,8 +12,8 @@ persistent private library.
 
 The `Deploy EXIF Studio to GitHub Pages` workflow tests the project, builds only
 the static inspector and its required assets, and deploys it from the `main`
-branch. It enables the GitHub Pages Actions source when the workflow token has
-permission. The site will be available at
+branch. Enable GitHub Pages with the **GitHub Actions** source in the repository
+settings before the first deployment. The site will be available at
 `https://bhagyoday38.github.io/exif-flask/` after a successful deployment.
 
 ## Run locally
