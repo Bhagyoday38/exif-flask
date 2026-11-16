@@ -1,5 +1,7 @@
 import json
+import math
 import os
+import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 import re
@@ -9,7 +11,6 @@ import time
 import warnings
 from uuid import uuid4
 
-import ffmpeg
 from flask import (
     Flask,
     abort,
@@ -33,7 +34,10 @@ ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png"}
 ALLOWED_VIDEO_EXTENSIONS = {"mp4", "avi", "mov", "mkv"}
 MAX_FILE_SIZE = 16 * 1024 * 1024
 MAX_BATCH_FILES = 10
-MAX_CONTENT_LENGTH = 64 * 1024 * 1024
+MAX_TOTAL_FILE_SIZE = 64 * 1024 * 1024
+MAX_MULTIPART_OVERHEAD = 1024 * 1024
+MAX_CONTENT_LENGTH = MAX_TOTAL_FILE_SIZE + MAX_MULTIPART_OVERHEAD
+VIDEO_PROBE_TIMEOUT_SECONDS = 15
 UPLOAD_ID_PATTERN = re.compile(r"[a-f0-9]{32}\Z")
 USERNAME_PATTERN = re.compile(r"[a-z0-9_]{3,32}\Z")
 LOGIN_WINDOW_SECONDS = 15 * 60
@@ -74,7 +78,7 @@ def get_exif_data(image_path):
             if not exif:
                 return None
 
-            exif_data = {
+            exif_data: dict[str, str | dict[str, str]] = {
                 ExifTags.TAGS.get(tag, str(tag)): _display_value(value)
                 for tag, value in exif.items()
             }
@@ -100,7 +104,17 @@ def dms_to_decimal(dms):
         if isinstance(dms, str):
             dms = [part.strip() for part in dms.split(",")]
         degrees, minutes, seconds = dms
-        return float(degrees) + float(minutes) / 60 + float(seconds) / 3600
+        degrees, minutes, seconds = map(float, (degrees, minutes, seconds))
+        if (
+            not all(math.isfinite(value) for value in (degrees, minutes, seconds))
+            or degrees < 0
+            or minutes < 0
+            or minutes >= 60
+            or seconds < 0
+            or seconds >= 60
+        ):
+            return None
+        return degrees + minutes / 60 + seconds / 3600
     except (TypeError, ValueError, ZeroDivisionError):
         return None
 
@@ -115,19 +129,43 @@ def get_gps_coordinates_from_image(exif_data):
 
     latitude = dms_to_decimal(gps_info.get("GPSLatitude", ()))
     longitude = dms_to_decimal(gps_info.get("GPSLongitude", ()))
-    if latitude is None or longitude is None:
+    latitude_ref = gps_info.get("GPSLatitudeRef")
+    longitude_ref = gps_info.get("GPSLongitudeRef")
+    if (
+        latitude is None
+        or longitude is None
+        or latitude_ref not in {"N", "S"}
+        or longitude_ref not in {"E", "W"}
+        or latitude > 90
+        or longitude > 180
+    ):
         return None, None
 
-    if gps_info.get("GPSLatitudeRef") == "S":
+    if latitude_ref == "S":
         latitude = -latitude
-    if gps_info.get("GPSLongitudeRef") == "W":
+    if longitude_ref == "W":
         longitude = -longitude
     return latitude, longitude
 
 
 def get_video_metadata(video_path):
     try:
-        probe = ffmpeg.probe(video_path)
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-show_format",
+                "-show_streams",
+                "-of",
+                "json",
+                str(video_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=VIDEO_PROBE_TIMEOUT_SECONDS,
+        )
+        probe = json.loads(result.stdout)
         video_stream = next(
             (stream for stream in probe["streams"] if stream.get("codec_type") == "video"),
             None,
@@ -141,7 +179,14 @@ def get_video_metadata(video_path):
             "height": video_stream.get("height"),
             "duration": float(duration) if duration is not None else None,
         }
-    except (ffmpeg.Error, OSError, KeyError, TypeError, ValueError):
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        OSError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
         return None
 
 
@@ -153,7 +198,7 @@ def _render_page(**context):
         csrf_token=_get_csrf_token(),
         max_file_size=MAX_FILE_SIZE,
         max_batch_files=MAX_BATCH_FILES,
-        max_total_size=MAX_CONTENT_LENGTH,
+        max_total_size=MAX_TOTAL_FILE_SIZE,
         **context,
     )
 
@@ -329,10 +374,17 @@ def _get_upload(upload_id, user_id):
 
 
 def _image_metadata(file_path):
+    expected_format = {
+        ".jpg": "JPEG",
+        ".jpeg": "JPEG",
+        ".png": "PNG",
+    }.get(file_path.suffix.lower())
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             with Image.open(file_path) as image:
+                if image.format != expected_format:
+                    raise ValueError("The image format does not match its extension.")
                 image.verify()
     except (
         UnidentifiedImageError,
@@ -455,12 +507,12 @@ def add_security_headers(response):
 
 
 @app.errorhandler(RequestEntityTooLarge)
-def handle_file_too_large(_error):
+def handle_file_too_large(error):
     return (
         _render_page(
             error="The upload is too large. Choose up to 10 files with a combined size under 64 MB."
         ),
-        413,
+        error.code,
     )
 
 
