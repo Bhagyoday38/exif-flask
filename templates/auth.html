@@ -3,11 +3,12 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#101c22">
+    <meta name="theme-color" content="#f5f7f4">
     <title>{% if mode == "register" %}Create account{% else %}Sign in{% endif %} · EXIF Studio</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <div class="page-shell">
         <header class="topbar">
             <a class="brand" href="{{ url_for('login') }}" aria-label="EXIF Studio">
@@ -17,7 +18,7 @@
             <span class="local-badge"><span aria-hidden="true"></span> PRIVATE LIBRARY</span>
         </header>
 
-        <main class="auth-main">
+        <main class="auth-main" id="main-content">
             <section class="auth-card" aria-labelledby="auth-title">
                 <p class="eyebrow">YOUR FILES, YOUR SPACE</p>
                 <h1 id="auth-title">{% if mode == "register" %}Create your account{% else %}Welcome back{% endif %}</h1>

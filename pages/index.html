@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7f4">
+    <meta name="description" content="Inspect photo EXIF and video details privately in your browser.">
+    <title>EXIF Studio — private media details</title>
+    <link rel="stylesheet" href="./assets/style.css">
+    <script src="./assets/metadata.js" defer></script>
+    <script src="./assets/app.js" defer></script>
+</head>
+<body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <div class="page-shell">
+        <header class="topbar">
+            <a class="brand" href="./" aria-label="EXIF Studio home">
+                <span class="brand-mark" aria-hidden="true">E</span>
+                <span>EXIF <span class="brand-light">STUDIO</span></span>
+            </a>
+            <span class="local-badge"><span aria-hidden="true"></span> PRIVATE BY DESIGN</span>
+        </header>
+
+        <main id="main-content">
+            <section class="intro" aria-labelledby="page-title">
+                <p class="eyebrow">A PRIVATE LOOK AT YOUR MEDIA</p>
+                <h1 id="page-title">The details behind<br><span>every frame.</span></h1>
+                <p class="intro-copy">
+                    See the information your photos and videos carry. Everything is
+                    inspected in this browser tab; your files are never uploaded.
+                </p>
+            </section>
+
+            <section class="workspace" aria-labelledby="upload-title">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">01 / ADD MEDIA</p>
+                        <h2 id="upload-title">Choose files to inspect</h2>
+                    </div>
+                    <p class="privacy-note">Media stays in this tab; no server upload</p>
+                </div>
+
+                <label class="drop-zone" id="drop-zone" for="files">
+                    <span class="upload-mark" aria-hidden="true">↑</span>
+                    <span class="drop-title">Drop files here or <span>browse</span></span>
+                    <span class="drop-help">JPEG, PNG, MP4, MOV, or WebM</span>
+                    <span class="selected-file" id="selected-file" aria-live="polite">
+                        Select up to 10 files · 16 MB each
+                    </span>
+                    <input
+                        type="file"
+                        id="files"
+                        accept=".jpg,.jpeg,.png,.mp4,.mov,.webm,image/jpeg,image/png,video/mp4,video/quicktime,video/webm"
+                        multiple
+                    >
+                </label>
+                <p class="selection-error" id="selection-error" role="alert" hidden></p>
+                <div class="form-actions">
+                    <p class="form-hint">Up to 10 files · 16 MB each · 64 MB total</p>
+                    <p class="form-hint">Video support depends on your browser</p>
+                </div>
+            </section>
+
+            <section class="library" aria-labelledby="library-title">
+                <div class="library-heading">
+                    <div>
+                        <p class="eyebrow">02 / YOUR FILES</p>
+                        <h2 id="library-title">Metadata review</h2>
+                    </div>
+                    <span class="file-count" id="file-count" aria-live="polite">0 files</span>
+                </div>
+
+                <div class="empty-state" id="empty-state">
+                    <span class="empty-mark" aria-hidden="true">—</span>
+                    <h3>Your private workspace is ready</h3>
+                    <p>Choose media above to see a preview and the details stored inside it.</p>
+                </div>
+                <div class="results-list" id="results-list" role="region" aria-label="Inspected media"></div>
+            </section>
+        </main>
+
+        <footer>
+            <span>EXIF Studio</span>
+            <p>Metadata may include device details and location. Opening a map sends coordinates to Google Maps.</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -3,12 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#101c22">
+    <meta name="theme-color" content="#f5f7f4">
     <title>EXIF Studio — image and video metadata</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <div class="page-shell">
         <header class="topbar">
             <a class="brand" href="{{ url_for('index') }}" aria-label="EXIF Studio home">
@@ -25,7 +26,7 @@
             </div>
         </header>
 
-        <main>
+        <main id="main-content">
             <section class="intro" aria-labelledby="page-title">
                 <p class="eyebrow">A CLEARER LOOK AT YOUR MEDIA</p>
                 <h1 id="page-title">Every file has<br><span>a story to tell.</span></h1>
@@ -41,7 +42,7 @@
                         <p class="eyebrow">01 / ADD MEDIA</p>
                         <h2 id="upload-title">Choose your files</h2>
                     </div>
-                    <p class="privacy-note">Stored on this device until you delete them</p>
+                    <p class="privacy-note">Saved in your private local library</p>
                 </div>
 
                 {% if error %}

@@ -2,6 +2,20 @@
 
 A local Flask app for reviewing image EXIF/GPS data and basic video metadata.
 
+## GitHub Pages
+
+The Pages site is a separate, browser-only inspector. It reads JPEG/PNG EXIF
+and GPS details plus video duration and resolution when the browser supports the
+file. Selected files are not uploaded or saved. Video format support depends on
+the browser; use the local Flask app for FFmpeg-backed AVI/MKV inspection and a
+persistent private library.
+
+The `Deploy EXIF Studio to GitHub Pages` workflow tests the project, builds only
+the static inspector and its required assets, and deploys it from the `main`
+branch. It enables the GitHub Pages Actions source when the workflow token has
+permission. The site will be available at
+`https://bhagyoday38.github.io/exif-flask/` after a successful deployment.
+
 ## Run locally
 
 ```powershell
@@ -22,7 +36,7 @@ to be installed and available on `PATH`.
 
 - Images: JPG, JPEG, PNG
 - Videos: MP4, AVI, MOV, MKV
-- Up to 10 files per batch, 16 MB per file, and 64 MB per request
+- Up to 10 files per batch, 16 MB per file, and 64 MB of files per batch
 
 Uploads and extracted metadata are stored locally and associated with the
 account that uploaded them. Only that account can list, preview, or delete its
@@ -44,4 +58,5 @@ production controls.
 
 ```powershell
 python -m unittest discover -s tests -v
+node --test tests-js
 ```
