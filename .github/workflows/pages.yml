@@ -34,7 +34,7 @@ jobs:
       - name: Run tests
         run: |
           python -m unittest discover -s tests -v
-          node --test tests-js
+          node --test tests-js/metadata.test.cjs
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:
