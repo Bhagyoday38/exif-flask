@@ -58,5 +58,5 @@ production controls.
 
 ```powershell
 python -m unittest discover -s tests -v
-node --test tests-js
+node --test tests-js/metadata.test.cjs
 ```
